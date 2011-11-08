@@ -26,7 +26,7 @@
 /* ------------- process/thread mechanism design&implementation -------------
 (an simplified Linux process/thread mechanism )
 introduction:
-  ucore implements a simple process/thread mechanism. process contains the independent memory sapce, at least one threads
+  ucore implements a simple process/thread mechanism. process contains the independent memory space, at least one threads
 for execution, the kernel data(for management), processor state (for context switch), files(in lab6), etc. ucore needs to
 manage all these details efficiently. In ucore, a thread is just a special kind of process(share process's memory).
 ------------------------------

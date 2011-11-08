@@ -10,5 +10,5 @@ src/linux-dos-module/dosm.ko
 src/linux-dos-module/dosm.mod.*
 src/linux-dos-module/modules.order
 src/linux-dos-module/Module.symvers
-
+*tags
 
