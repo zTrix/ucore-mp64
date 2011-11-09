@@ -1,0 +1,2 @@
+
+void mod_init();

@@ -2,7 +2,7 @@
 
 SRCFILES   := $(shell find . '(' '!' -regex '.*/_.*' ')' -and '(' -iname "*.c" -or -iname "*.S" ')' | sed -e 's!\./!!g') ../glue-kern/bootinfo.S
 T_CC_FLAGS := 	-I../glue-kern -Iglue-ucore -Iglue-ucore/libs -Ilibs -Idebug -Idriver -Imm -Isync -Ischedule -Iprocess -Ifs \
-				-Ifs/swap -Ifs/vfs -Ifs/pipe -Ifs/sfs -Ifs/devs -Isyscall
+				-Ifs/swap -Ifs/vfs -Ifs/pipe -Ifs/sfs -Ifs/devs -Isyscall -Imodule
 
 include ${T_BASE}/mk/compk.mk
 include ${T_BASE}/mk/template.mk

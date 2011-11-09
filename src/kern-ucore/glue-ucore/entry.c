@@ -6,6 +6,7 @@
 #include <sched.h>
 #include <proc.h>
 #include <swap.h>
+#include <mod.h>
 #include <fs.h>
 #include <clock.h>
 #include <intr.h>
@@ -40,6 +41,7 @@ __kern_entry(void)
 
 		ide_init();
 		swap_init();                // init swap
+		mod_init();
 		fs_init();                  // init fs
 		
 		clock_init();
