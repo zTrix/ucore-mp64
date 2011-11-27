@@ -41,8 +41,8 @@ __kern_entry(void)
 
 		ide_init();
 		swap_init();                // init swap
-		mod_init();
 		fs_init();                  // init fs
+		mod_init();
 		
 		clock_init();
 
