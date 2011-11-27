@@ -42,9 +42,9 @@ __kern_entry(void)
 		ide_init();
 		swap_init();                // init swap
 		fs_init();                  // init fs
-		mod_init();
 		
 		clock_init();
+		mod_init();
 
 		init_finished = 1;
 		spinlock_release(&init_lock);

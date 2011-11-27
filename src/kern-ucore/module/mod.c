@@ -2,6 +2,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <kio.h>
+#include <file.h>
+#include <stat.h>
+#include <slab.h>
 
 #define CHARS_MAX            10240
 static uint32_t char_count;
@@ -21,6 +24,8 @@ static int         ex_sym_n[EXPORT_SYM_COUNT_MAX];
 static void touch_export_sym(const char *name, uintptr_t ptr, uint32_t flags);
 static uint32_t sym_hash(const char *name, uint32_t len);
 
+void load_mod_test();
+
 /** 
  * init kerner-module system, setup symbol system, and export common symbols
  */
@@ -37,6 +42,33 @@ mod_init() {
 
     EXPORT(kprintf);
 
+    kprintf("mod_init done\n");
+
+    load_mod_test();
+}
+
+void load_mod_test() {
+    kprintf("loading kern-module test\n");
+    int test_fd = file_open("hello.txt", O_RDONLY);
+    kprintf("%s %d\n", __FILE__, __LINE__);
+    struct stat mod_stat;
+    kprintf("%s %d\n", __FILE__, __LINE__);
+    memset(&mod_stat, 0, sizeof(mod_stat));
+    kprintf("%s %d\n", __FILE__, __LINE__);
+    file_fstat(test_fd, &mod_stat);
+    kprintf("%s %d\n", __FILE__, __LINE__);
+    if (mod_stat.st_size <= 0 || mod_stat.st_size > (1<<20)) {
+        kprintf("wrong obj file size: %d\n", mod_stat.st_size);
+        return;
+    }
+    kprintf("loading test kern module, size = %d\n", mod_stat.st_size);
+    void * buffer = kmalloc(mod_stat.st_size + 1);
+    if (buffer == NULL) {
+        panic("load mod test failed: insufficient memory");
+    }
+    size_t copied;
+    file_read(test_fd, buffer, mod_stat.st_size, &copied);
+    kprintf("obj mem: %X\n", buffer);
 }
 
 static void touch_export_sym(const char *name, uintptr_t ptr, uint32_t flags) {
