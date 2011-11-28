@@ -49,14 +49,11 @@ mod_init() {
 
 void load_mod_test() {
     kprintf("loading kern-module test\n");
-    int test_fd = file_open("hello.txt", O_RDONLY);
-    kprintf("%s %d\n", __FILE__, __LINE__);
+    char test_file_path[] = "/kern-module/mod-test.o";
+    int test_fd = file_open(test_file_path, O_RDONLY);
     struct stat mod_stat;
-    kprintf("%s %d\n", __FILE__, __LINE__);
     memset(&mod_stat, 0, sizeof(mod_stat));
-    kprintf("%s %d\n", __FILE__, __LINE__);
     file_fstat(test_fd, &mod_stat);
-    kprintf("%s %d\n", __FILE__, __LINE__);
     if (mod_stat.st_size <= 0 || mod_stat.st_size > (1<<20)) {
         kprintf("wrong obj file size: %d\n", mod_stat.st_size);
         return;
@@ -68,7 +65,7 @@ void load_mod_test() {
     }
     size_t copied;
     file_read(test_fd, buffer, mod_stat.st_size, &copied);
-    kprintf("obj mem: %X\n", buffer);
+    kprintf("obj mem: %x, size is %d\n", buffer, copied);
 }
 
 static void touch_export_sym(const char *name, uintptr_t ptr, uint32_t flags) {
