@@ -22,7 +22,7 @@ struct elfhdr {
     uint16_t e_shentsize;
     uint16_t e_shnum;
     uint16_t e_shstrndx;
-};
+}__attribute__((packed));
 
 /* program section header */
 struct proghdr {
@@ -38,17 +38,33 @@ struct proghdr {
 
 /* section header */
 struct secthdr {
-     uint64_t sh_name;
-     uint64_t sh_type;
+     uint32_t sh_name;
+     uint32_t sh_type;
      uint64_t sh_flags;
      uint64_t sh_addr;
      uint64_t sh_offset;
      uint64_t sh_size;
-     uint64_t sh_link;
-     uint64_t sh_info;
+     uint32_t sh_link;
+     uint32_t sh_info;
      uint64_t sh_addralign;
      uint64_t sh_entsize;
-};
+}__attribute__((packed));
+
+struct reloc_s {
+    uint64_t rl_offset;         /* Location at which to apply the action */
+    uint64_t rl_info;           /* index and type of relocation */
+} __attribute__((packed));
+
+struct reloc_a_s {
+    uint64_t rl_offset;         /* Location at which to apply the action */
+    uint64_t rl_info;           /* index and type of relocation */
+    int64_t rl_addend;          /* Constant addend used to compute value */
+} __attribute__((packed));
+
+#define SH_TYPE_SYMTAB 2
+#define SH_TYPE_STRTAB 3
+#define SH_TYPE_NOBITS 8
+#define SH_TYPE_RELOC  9
 
 /* values for Proghdr::p_type */
 #define ELF_PT_LOAD                     1

@@ -27,6 +27,7 @@ static int         ex_sym_n[EXPORT_SYM_COUNT_MAX];
 static void touch_export_sym(const char *name, uintptr_t ptr, uint32_t flags);
 static uint32_t sym_hash(const char *name, uint32_t len);
 static int elf_head_check(void * elf);
+static int elf_mod_parse(uintptr_t elf, const char *name, int export_symbol, uintptr_t * common_data, uint32_t * common_size, uintptr_t * mod_load_ptr, uintptr_t * mod_unload_ptr);
 
 void load_mod_test();
 
@@ -86,11 +87,41 @@ int elf_mod_load(uintptr_t image, uint32_t image_size, struct elf_mod_info_s * i
     if (elf_head_check((void *)image)) {
         return -1;
     }
-    // stack 0
+    
+    struct elfhdr * eh = (struct elfhdr *)image;
+
+    if (elf_mod_parse(image, "name", 0, &info->common_ptr, &info->common_size, &info->load_ptr, &info->unload_ptr)) {
+        return -1;
+    }
+    return 0;
+}
+
+static int elf_mod_parse(uintptr_t elf, const char *name, int export_symbol, 
+        uintptr_t * common_data, uint32_t * common_size,
+        uintptr_t * mod_load_ptr, uintptr_t * mod_unload_ptr) {
+    uint32_t i, x;
+    uintptr_t reloc_addr, mem_addr;
+    uintptr_t mod_load = 0, mod_unload = 0;
+
+    struct elfhdr *eh;
+    struct secthdr *sh;
+    //struct reloc_s *reloc;
+    //struct symtab_s *symtab;
+
+    eh = (struct elfhdr *)elf;
+
+    kprintf("[ II ] shnum = %d, shsize = %d\n", eh->e_shnum, eh->e_shentsize);
+
+    for (i = 0; i < eh->e_shnum; i++) {
+        sh = (struct secthdr*)(elf + eh->e_shoff + (i * eh->e_shentsize));
+        kprintf("[ II ] sh type = %d\n", sh->sh_type);
+    }
+
     return 0;
 }
 
 static int elf_head_check(void * elf) {
+    kprintf("[ II ] begin elf header check\n");
     struct elfhdr * eh = (struct elfhdr *)elf;
     if (eh->e_magic != ELF_MAGIC) {
         error("invalid signature: %x\n", eh->e_magic);
