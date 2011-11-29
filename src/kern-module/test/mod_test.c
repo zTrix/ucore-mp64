@@ -1,8 +1,8 @@
 
-void init_module() {
-    kprintf("init test module\n");
+int init_module(int a, int b) {
+    return a + b;
 }
 
 void cleanup_module() {
-    kprintf("cleanup test module\n");
+    kprintf("executing cleanup_module ...");
 }

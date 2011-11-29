@@ -7,6 +7,7 @@
 #include <slab.h>
 #include <elf.h>
 #include <bitsearch.h>
+#include <mmu.h>
 
 #define error(x ...) kprintf("[ EE ] %s:%d, ", __FILE__, __LINE__);kprintf(x)
 
@@ -28,6 +29,7 @@ static int         ex_sym_n[EXPORT_SYM_COUNT_MAX];
 static void touch_export_sym(const char *name, uintptr_t ptr, uint32_t flags);
 static uint32_t sym_hash(const char *name, uint32_t len);
 static int elf_head_check(void * elf);
+static int find_export_sym(const char *name, int touch);
 static int elf_mod_parse(uintptr_t elf, const char *name, int export_symbol, uintptr_t * common_data, uint32_t * common_size, uintptr_t * mod_load_ptr, uintptr_t * mod_unload_ptr);
 
 void load_mod_test();
@@ -37,6 +39,24 @@ void load_mod_test();
  */
 
 #define EXPORT(name) touch_export_sym(#name, (uintptr_t)&name, 0)
+
+typedef void (*voidfunction)();
+typedef int (*aplusbfunc)(int a, int b);
+
+void load_result() {
+    int a = 1;
+    int b = 1;
+    kprintf("[ TT ] test a + b module, looking up symbol ...\n");
+    int idx = find_export_sym(MOD_INIT_MODULE, 0);
+    kprintf("[ TT ] symbol found: %d\n", idx);
+    int r = ((aplusbfunc)(ex_sym_ptr[idx]))(a, b);
+    kprintf("[ TT ] %d + %d = %d\n", a, b, r);
+
+    kprintf("[ TT ] test cleanup module, looking up symbol...\n");
+    idx = find_export_sym(MOD_CLEANUP_MODULE, 0);
+    kprintf("[ TT ] symbol found: %d\n", idx);
+    ((voidfunction)(ex_sym_ptr[idx]))();
+}
 
 void
 mod_init() {
@@ -56,6 +76,8 @@ mod_init() {
 
     struct elf_mod_info_s info;
     elf_mod_load(mod_test_addr, mod_test_size, &info);
+
+    load_result();
 }
 
 void load_mod_test(uintptr_t * addr, uint32_t * size) {
@@ -91,9 +113,10 @@ int elf_mod_load(uintptr_t image, uint32_t image_size, struct elf_mod_info_s * i
     
     struct elfhdr * eh = (struct elfhdr *)image;
 
-    if (elf_mod_parse(image, "name", 0, &info->common_ptr, &info->common_size, &info->load_ptr, &info->unload_ptr)) {
+    if (elf_mod_parse(image, "", 1, &info->common_ptr, &info->common_size, &info->load_ptr, &info->unload_ptr)) {
         return -1;
     }
+
     return 0;
 }
 
@@ -194,16 +217,34 @@ static int elf_mod_get_symbol(const char *name, void **ptr, uint32_t *flags) {
     return 0;
 }
 
+static struct symtab_s * fill_symbol_struct(uintptr_t elf, uint32_t symbol) {
+    uint32_t i;
+    struct elfhdr *eh;
+    struct secthdr * sh;
+    struct symtab_s * symtab;
+
+    eh = (struct elfhdr *)elf;
+    for (i = 0; i < eh->e_shnum; i++) {
+        sh = (struct secthdr *)(elf + eh->e_shoff + (i * eh->e_shentsize));
+        if (sh->sh_type == SH_TYPE_SYMTAB) {
+            symtab = (struct symtab_s*)(elf + sh->sh_offset + (symbol * sh->sh_entsize));
+            return (struct symtab_s *)symtab;
+        }
+    }
+    return (struct symtab_s *)0;
+}
+
 static int elf_mod_parse(uintptr_t elf, const char *name, int export_symbol, 
         uintptr_t * common_data, uint32_t * common_size,
         uintptr_t * mod_load_ptr, uintptr_t * mod_unload_ptr) {
     uint32_t i, x;
-    uintptr_t reloc_addr, mem_addr;
+    uintptr_t reloc_addr;
+    uint32_t * mem_addr;
     uintptr_t mod_load = 0, mod_unload = 0;
 
     struct elfhdr *eh;
     struct secthdr *sh;
-    //struct reloc_s *reloc;
+    struct reloc_a_s *reloc;
     struct symtab_s *symtab;
 
     uintptr_t cur_common_alloc = 0;
@@ -251,6 +292,7 @@ static int elf_mod_parse(uintptr_t elf, const char *name, int export_symbol,
                             break;
                     }
                 } else if (symtab->sym_shndx == SHN_COMMON) {
+                    // TODO: implement SHN_COMMON
                     kprintf("[ EE ] not implemented\n");
                 } else {
                     kprintf("[ II ] shndx[%04x]\n", symtab->sym_shndx);
@@ -268,6 +310,93 @@ static int elf_mod_parse(uintptr_t elf, const char *name, int export_symbol,
             cur_common_alloc = ((cur_common_alloc - 1) | (sh->sh_addralign - 1)) + 1;
             sh->sh_addr = cur_common_alloc;
             cur_common_alloc += sh->sh_size;
+        }
+    }
+
+    uintptr_t common_space;
+    if (cur_common_align > PGSIZE) {
+        error("align failed\n");
+        return -1;
+    } else if (cur_common_alloc > 0) {
+        common_space = (uintptr_t)kmalloc(cur_common_alloc);
+        memset((void*)common_space, 0, cur_common_alloc);
+
+        *common_data = common_space;
+        *common_size = cur_common_alloc;
+    } else {
+        *common_data = 0;
+        *common_size = 0;
+    }
+
+    // fill the relocation entries
+    for (i = 0; i < eh->e_shnum; i++) {
+        sh = (struct secthdr *)(elf + eh->e_shoff + (i * eh->e_shentsize));
+
+        if (sh->sh_type == SH_TYPE_RELA) {
+            for (x = 0; x < sh->sh_size; x += sh->sh_entsize) {
+                reloc = (struct reloc_s *)(elf + sh->sh_offset + x);
+                symtab = fill_symbol_struct(elf, GET_RELOC_SYM(reloc->rl_info));
+
+                kprintf("[ II ] reloc[%02x] offset[%08x] for [%s], sym offset[%08x]\n",
+                        GET_RELOC_TYPE(reloc->rl_info),
+                        reloc->rl_offset,
+                        get_symbol_string(elf, symtab->sym_name),
+                        symtab->sym_address);
+
+                mem_addr = elf + reloc->rl_offset;
+                mem_addr += get_section_offset(elf, sh->sh_info);
+
+                /* external reference (kernel symbol most likely) */
+                if (symtab->sym_shndx == SHN_UNDEF) {
+                    const char *sym_name = get_symbol_string(elf, symtab->sym_name);
+                    int idx = find_export_sym(sym_name, 0);
+                    if (idx == -1) {
+                        if (strcmp(sym_name, name) == 0) {
+                            reloc_addr = elf;
+                        } else {
+                            error("unresolved symbol \"%s\", set with 0\n", sym_name);
+                            reloc_addr = 0;
+                        }
+                    } else {
+                        kprintf("external symbol %s addr = %p\n", sym_name, ex_sym_ptr[idx]);
+                        reloc_addr = ex_sym_ptr[idx];
+                    }
+                } else if (symtab->sym_shndx < 0xff00) {
+                    kprintf("section offset %16x, addr %16x\n", get_section_offset(elf, symtab->sym_shndx), symtab->sym_address);
+                    if (((struct secthdr *)(elf + eh->e_shoff + (symtab->sym_shndx * eh->e_shentsize)))->sh_type == SH_TYPE_NOBITS) {
+                        reloc_addr = common_space;
+                    } else {
+                        reloc_addr = elf;
+                    }
+                    reloc_addr += get_section_offset(elf, symtab->sym_shndx);
+                    reloc_addr += symtab->sym_address;
+                } else if (symtab->sym_shndx == SHN_COMMON) {
+                    reloc_addr = common_space + symtab->sym_address;
+                } else {
+                    error("unhandled syn_shndx\n");
+                }
+                
+                switch (GET_RELOC_TYPE(reloc->rl_info)) {
+                    case 0x02:      // S + A - P
+                        reloc_addr = reloc_addr - (uintptr_t)mem_addr;
+                        //*(uintptr_t *)mem_addr = reloc_addr + *(uintptr_t *)mem_addr;
+                        *mem_addr = reloc_addr + reloc->rl_addend;
+                        kprintf("fill rel address %08x to %08x\n", *mem_addr, mem_addr);
+                        break;
+
+                    case 0x0b:      // S + A
+                        *mem_addr = reloc_addr + reloc->rl_addend;
+                        kprintf("fill rel address %08x to %08x\n", *mem_addr, mem_addr);
+                        break;
+
+                    default:
+                        error("unsupported relocation type (%x)\n", GET_RELOC_TYPE(reloc->rl_info));
+                        break;
+
+                }
+            }
+        } else if (sh->sh_type == SH_TYPE_REL) {
+            kprintf("[ EE ] relocation SH_TYPE_REL not implemented\n");
         }
     }
 

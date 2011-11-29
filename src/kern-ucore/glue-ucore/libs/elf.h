@@ -70,10 +70,16 @@ struct symtab_s {
     uint64_t sym_size;
 } __attribute__((packed));
 
+#define SH_TYPE_NULL   0
+#define SH_TYPE_PROGBITS 1
 #define SH_TYPE_SYMTAB 2
 #define SH_TYPE_STRTAB 3
+#define SH_TYPE_RELA   4
+#define SH_TYPE_HASH   5
+#define SH_TYPE_DYNAMIC 6
+#define SH_TYPE_NOTE   7
 #define SH_TYPE_NOBITS 8
-#define SH_TYPE_RELOC  9
+#define SH_TYPE_REL  9
 
 #define SHN_UNDEF 0
 #define SHN_COMMON 0xfff2
