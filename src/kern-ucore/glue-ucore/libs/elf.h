@@ -75,6 +75,31 @@ struct symtab_s {
 #define SH_TYPE_NOBITS 8
 #define SH_TYPE_RELOC  9
 
+#define SHN_UNDEF 0
+#define SHN_COMMON 0xfff2
+
+#define GET_RELOC_SYM(i) ((i)>>32)
+#define GET_RELOC_TYPE(i) ((i)&0xffffffff)
+
+#define GET_SYMTAB_BIND(i) ((i) >> 4)
+#define GET_SYMTAB_TYPE(i) ((i) & 0xf)
+
+// symbol table bindings
+#define STB_LOCAL 0
+#define STB_GLOBAL 1
+#define STB_WEAK 2
+#define STB_LOPROC 13
+#define STB_HIPROC 15
+
+// symbol table type
+#define STT_NOTYPE 0
+#define STT_OBJECT 1
+#define STT_FUNC   2
+#define STT_SECTION 3
+#define STT_FILE   4
+#define STT_LOPROC 13
+#define STT_HIPROC 15
+
 /* values for Proghdr::p_type */
 #define ELF_PT_LOAD                     1
 

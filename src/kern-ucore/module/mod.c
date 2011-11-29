@@ -6,6 +6,7 @@
 #include <stat.h>
 #include <slab.h>
 #include <elf.h>
+#include <bitsearch.h>
 
 #define error(x ...) kprintf("[ EE ] %s:%d, ", __FILE__, __LINE__);kprintf(x)
 
@@ -121,6 +122,78 @@ static const char * get_symbol_string(uintptr_t elf, uint32_t index) {
     return "";
 }
 
+static uintptr_t get_section_offset(uintptr_t elf, uint32_t info) {
+    struct elfhdr * eh;
+    struct secthdr * sh;
+    eh = (struct elfhdr *)elf;
+    sh = (struct secthdr *)(elf + eh->e_shoff + (info * eh->e_shentsize));
+
+    uintptr_t result;
+    if (sh->sh_type == SH_TYPE_NOBITS) {
+        result = sh->sh_addr;
+    } else {
+        result = sh->sh_offset;
+    }
+    return result;
+}
+
+static int find_export_sym(const char *name, int touch) {
+    int name_len = strlen(name);
+    int h = sym_hash(name, name_len);
+    int cur = ex_sym_f[h];
+
+    while (cur != -1) {
+        if (strcmp(ex_sym_name[cur], name) == 0) {
+            break;
+        } else {
+            cur = ex_sym_n[cur];
+        }
+    }
+
+    if (cur == -1 && touch) {
+        cur = ex_sym_count++;
+        ex_sym_n[cur] = ex_sym_f[h];
+        ex_sym_f[h] = cur;
+
+        char * _name = chars + char_count;
+        memmove(_name, name, name_len);
+        char_count += name_len;
+        chars[char_count++] = 0;
+        ex_sym_name[cur] = _name;
+    }
+    return cur;
+}
+
+static void elf_mod_touch_symbol(const char *name, void * ptr, uint32_t flags) {
+    int idx = find_export_sym(name, 1);
+    ex_sym_ptr[idx] = (uintptr_t)ptr;
+    ex_sym_flags[idx] = flags;
+}
+
+static int elf_mod_create_symbol(const char *name, void *ptr, uint32_t flags) {
+    int idx = find_export_sym(name, 1);
+    if (idx != ex_sym_count - 1) {
+        return -1;
+    }
+    ex_sym_ptr[idx] = (uintptr_t)ptr;
+    ex_sym_flags[idx] = flags;
+    return 0;
+}
+
+static int elf_mod_get_symbol(const char *name, void **ptr, uint32_t *flags) {
+    int idx = find_export_sym(name, 0);
+    if (idx == -1) {
+        return -1;
+    }
+    if (ptr != NULL) {
+        *ptr = (void *)ex_sym_ptr[idx];
+    }
+    if (flags != NULL) {
+        *flags = ex_sym_flags[idx];
+    }
+    return 0;
+}
+
 static int elf_mod_parse(uintptr_t elf, const char *name, int export_symbol, 
         uintptr_t * common_data, uint32_t * common_size,
         uintptr_t * mod_load_ptr, uintptr_t * mod_unload_ptr) {
@@ -132,6 +205,9 @@ static int elf_mod_parse(uintptr_t elf, const char *name, int export_symbol,
     struct secthdr *sh;
     //struct reloc_s *reloc;
     struct symtab_s *symtab;
+
+    uintptr_t cur_common_alloc = 0;
+    uintptr_t cur_common_align = 1;
 
     eh = (struct elfhdr *)elf;
 
@@ -148,7 +224,50 @@ static int elf_mod_parse(uintptr_t elf, const char *name, int export_symbol,
                         symtab->sym_info,
                         symtab->sym_size,
                         symtab->sym_address);
+                if (symtab->sym_shndx != SHN_UNDEF && symtab->sym_shndx < 0xff00) {
+                    kprintf("[ II ]     value offset [%08x]\n", get_section_offset(elf, symtab->sym_shndx) + symtab->sym_address);
+                    const char * sym_name = get_symbol_string(elf, symtab->sym_name);
+                    switch (GET_SYMTAB_BIND(symtab->sym_info)) {
+                        case STB_GLOBAL:
+                            kprintf("[ II ]     global symbol\n");
+                        case STB_LOCAL:
+                            if (strcmp(sym_name, MOD_INIT_MODULE) == 0) {
+                                mod_load = get_section_offset(elf, symtab->sym_shndx) + symtab->sym_address + elf;
+                            } else if (strcmp(sym_name, MOD_CLEANUP_MODULE) == 0) {
+                                mod_unload = get_section_offset(elf, symtab->sym_shndx) + symtab->sym_address + elf;
+                            }
+
+                            // global
+                            if (GET_SYMTAB_BIND(symtab->sym_info) == 1 && export_symbol) {
+                                elf_mod_touch_symbol(sym_name, (void *)(symtab->sym_address + elf), 0);
+                            }
+                            break;
+
+                        case STB_WEAK:
+                            kprintf("[ II ]     weak symbol\n");
+                            if (export_symbol) {
+                                elf_mod_create_symbol(sym_name, (void *)(symtab->sym_address + elf), 0);
+                            }
+                            break;
+                    }
+                } else if (symtab->sym_shndx == SHN_COMMON) {
+                    kprintf("[ EE ] not implemented\n");
+                } else {
+                    kprintf("[ II ] shndx[%04x]\n", symtab->sym_shndx);
+                }
             }
+        } else if (sh->sh_type == SH_TYPE_NOBITS) {
+            kprintf("[ II ] bss section, alloc %d byte align 0x%x\n", sh->sh_size, sh->sh_addralign);
+            if (bsf(sh->sh_addralign != bsr(sh->sh_addralign))) {
+                error(" bad align\n");
+                return -1;
+            }
+            if (sh->sh_addralign > cur_common_align) {
+                cur_common_align = sh->sh_addralign;
+            }
+            cur_common_alloc = ((cur_common_alloc - 1) | (sh->sh_addralign - 1)) + 1;
+            sh->sh_addr = cur_common_alloc;
+            cur_common_alloc += sh->sh_size;
         }
     }
 

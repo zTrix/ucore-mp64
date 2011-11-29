@@ -3,6 +3,9 @@
 
 #include <stdio.h>
 
+#define MOD_INIT_MODULE "init_module"
+#define MOD_CLEANUP_MODULE "cleanup_module"
+
 struct elf_mod_info_s {
      uintptr_t image;
      uint32_t  image_size;
