@@ -5,6 +5,9 @@
 #include <file.h>
 #include <stat.h>
 #include <slab.h>
+#include <elf.h>
+
+#define error(x ...) kprintf("[ EE ] %s:%d, ", __FILE__, __LINE__);kprintf(x)
 
 #define CHARS_MAX            10240
 static uint32_t char_count;
@@ -23,6 +26,7 @@ static int         ex_sym_n[EXPORT_SYM_COUNT_MAX];
 
 static void touch_export_sym(const char *name, uintptr_t ptr, uint32_t flags);
 static uint32_t sym_hash(const char *name, uint32_t len);
+static int elf_head_check(void * elf);
 
 void load_mod_test();
 
@@ -43,11 +47,16 @@ mod_init() {
     EXPORT(kprintf);
 
     kprintf("mod_init done\n");
+    
+    uintptr_t mod_test_addr;
+    uint32_t mod_test_size;
+    load_mod_test(&mod_test_addr, &mod_test_size);
 
-    load_mod_test();
+    struct elf_mod_info_s info;
+    elf_mod_load(mod_test_addr, mod_test_size, &info);
 }
 
-void load_mod_test() {
+void load_mod_test(uintptr_t * addr, uint32_t * size) {
     kprintf("loading kern-module test\n");
     char test_file_path[] = "/kern-module/mod-test.o";
     int test_fd = file_open(test_file_path, O_RDONLY);
@@ -66,6 +75,50 @@ void load_mod_test() {
     size_t copied;
     file_read(test_fd, buffer, mod_stat.st_size, &copied);
     kprintf("obj mem: %x, size is %d\n", buffer, copied);
+    *addr = (uintptr_t)buffer;
+    *size = mod_stat.st_size;
+}
+
+int elf_mod_load(uintptr_t image, uint32_t image_size, struct elf_mod_info_s * info) {
+    info->image = image;
+    info->image_size = image_size;
+
+    if (elf_head_check((void *)image)) {
+        return -1;
+    }
+    // stack 0
+    return 0;
+}
+
+static int elf_head_check(void * elf) {
+    struct elfhdr * eh = (struct elfhdr *)elf;
+    if (eh->e_magic != ELF_MAGIC) {
+        error("invalid signature: %x\n", eh->e_magic);
+        return -1;
+    }
+
+    if (eh->e_elf[0] != 0x2) {
+        error("not ELFCLASS64");
+        return -1;
+    }
+
+    if (eh->e_type != 0x01) {       // ET_REL , Relocatable object file
+        error("error type: %d\n", eh->e_type);
+        return -1;
+    }
+
+    if (eh->e_machine != 0x3e) {    // AMD x86-64 architecture
+        error("error machine type: %d \n", eh->e_machine);
+        return -1;
+    }
+
+    if (eh->e_entry != 0x0) {
+        error("error entry code: %d\n", eh->e_entry);
+        return -1;
+    }
+    
+    kprintf("[ OK ] elf head check passed !\n");
+    return 0;
 }
 
 static void touch_export_sym(const char *name, uintptr_t ptr, uint32_t flags) {

@@ -36,6 +36,20 @@ struct proghdr {
     uint64_t p_align;
 };
 
+/* section header */
+struct secthdr {
+     uint64_t sh_name;
+     uint64_t sh_type;
+     uint64_t sh_flags;
+     uint64_t sh_addr;
+     uint64_t sh_offset;
+     uint64_t sh_size;
+     uint64_t sh_link;
+     uint64_t sh_info;
+     uint64_t sh_addralign;
+     uint64_t sh_entsize;
+};
+
 /* values for Proghdr::p_type */
 #define ELF_PT_LOAD                     1
 

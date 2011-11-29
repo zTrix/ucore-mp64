@@ -15,5 +15,6 @@ struct elf_mod_info_s {
 };
 
 void mod_init();
+int elf_mod_load(uintptr_t image, uint32_t image_size, struct elf_mod_info_s * info);
 
 #endif
