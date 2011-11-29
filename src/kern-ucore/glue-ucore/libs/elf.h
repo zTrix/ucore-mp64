@@ -61,6 +61,15 @@ struct reloc_a_s {
     int64_t rl_addend;          /* Constant addend used to compute value */
 } __attribute__((packed));
 
+struct symtab_s {
+    uint32_t sym_name;
+    uint8_t  sym_info;
+    uint8_t  sym_other;
+    uint16_t sym_shndx;
+    uint64_t sym_address;
+    uint64_t sym_size;
+} __attribute__((packed));
+
 #define SH_TYPE_SYMTAB 2
 #define SH_TYPE_STRTAB 3
 #define SH_TYPE_NOBITS 8

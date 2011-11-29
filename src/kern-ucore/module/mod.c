@@ -96,6 +96,31 @@ int elf_mod_load(uintptr_t image, uint32_t image_size, struct elf_mod_info_s * i
     return 0;
 }
 
+static const char * get_symbol_string(uintptr_t elf, uint32_t index) {
+    uint32_t i;
+    struct elfhdr * eh;
+    struct secthdr * sh;
+    struct symtab_s * symtab;
+
+    eh = (struct elfhdr *)elf;
+
+    for (i = 0; i < eh->e_shnum; i++) {
+        sh = (struct secthdr *)(elf + eh->e_shoff + (i * eh->e_shentsize));
+        if (sh->sh_type == SH_TYPE_SYMTAB) {
+            symtab = (struct symtab_s *)(elf + sh->sh_offset);
+            sh = (struct secthdr *)(elf + eh->e_shoff + (sh->sh_link * eh->e_shentsize));
+            if (sh->sh_type == SH_TYPE_STRTAB) {
+                if (index == 0) {
+                    return " ";
+                } else {
+                    return (char *)(elf + sh->sh_offset + index);
+                }
+            }
+        }
+    }
+    return "";
+}
+
 static int elf_mod_parse(uintptr_t elf, const char *name, int export_symbol, 
         uintptr_t * common_data, uint32_t * common_size,
         uintptr_t * mod_load_ptr, uintptr_t * mod_unload_ptr) {
@@ -106,7 +131,7 @@ static int elf_mod_parse(uintptr_t elf, const char *name, int export_symbol,
     struct elfhdr *eh;
     struct secthdr *sh;
     //struct reloc_s *reloc;
-    //struct symtab_s *symtab;
+    struct symtab_s *symtab;
 
     eh = (struct elfhdr *)elf;
 
@@ -115,6 +140,16 @@ static int elf_mod_parse(uintptr_t elf, const char *name, int export_symbol,
     for (i = 0; i < eh->e_shnum; i++) {
         sh = (struct secthdr*)(elf + eh->e_shoff + (i * eh->e_shentsize));
         kprintf("[ II ] sh type = %d\n", sh->sh_type);
+        if (sh->sh_type == SH_TYPE_SYMTAB) {
+            for (x = 0; x < sh->sh_size; x += sh->sh_entsize) {
+                symtab = (struct symtab_s *)(elf + sh->sh_offset + x);
+                kprintf("[ II ] found sym: [%s] info[%02x] size[%d] addr[%08x]\n",
+                        get_symbol_string(elf, symtab->sym_name),
+                        symtab->sym_info,
+                        symtab->sym_size,
+                        symtab->sym_address);
+            }
+        }
     }
 
     return 0;
