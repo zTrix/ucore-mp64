@@ -280,7 +280,7 @@ static int elf_mod_parse(uintptr_t elf, const char *name, int export_symbol,
 
                             // global
                             if (GET_SYMTAB_BIND(symtab->sym_info) == 1 && export_symbol) {
-                                elf_mod_touch_symbol(sym_name, (void *)(symtab->sym_address + elf), 0);
+                                elf_mod_touch_symbol(sym_name, (void *)(get_section_offset(elf, symtab->sym_shndx) + symtab->sym_address + elf), 0);
                             }
                             break;
 
