@@ -239,7 +239,7 @@ static int elf_mod_parse(uintptr_t elf, const char *name, int export_symbol,
         uintptr_t * mod_load_ptr, uintptr_t * mod_unload_ptr) {
     uint32_t i, x;
     uintptr_t reloc_addr;
-    uint32_t * mem_addr;
+    void * mem_addr;
     uintptr_t mod_load = 0, mod_unload = 0;
 
     struct elfhdr *eh;
@@ -343,8 +343,7 @@ static int elf_mod_parse(uintptr_t elf, const char *name, int export_symbol,
                         get_symbol_string(elf, symtab->sym_name),
                         symtab->sym_address);
 
-                mem_addr = elf + reloc->rl_offset;
-                mem_addr += get_section_offset(elf, sh->sh_info);
+                mem_addr = elf + reloc->rl_offset + get_section_offset(elf, sh->sh_info);
 
                 /* external reference (kernel symbol most likely) */
                 if (symtab->sym_shndx == SHN_UNDEF) {
@@ -380,13 +379,13 @@ static int elf_mod_parse(uintptr_t elf, const char *name, int export_symbol,
                     case 0x02:      // S + A - P
                         reloc_addr = reloc_addr - (uintptr_t)mem_addr;
                         //*(uintptr_t *)mem_addr = reloc_addr + *(uintptr_t *)mem_addr;
-                        *mem_addr = reloc_addr + reloc->rl_addend;
-                        kprintf("fill rel address %08x to %08x\n", *mem_addr, mem_addr);
+                        *(uint32_t *)mem_addr = reloc_addr + reloc->rl_addend;
+                        kprintf("fill rel address %08x to %08x\n", *(uint32_t *)mem_addr, mem_addr);
                         break;
 
                     case 0x0b:      // S + A
-                        *mem_addr = reloc_addr + reloc->rl_addend;
-                        kprintf("fill rel address %08x to %08x\n", *mem_addr, mem_addr);
+                        *(uint32_t *)mem_addr = reloc_addr + reloc->rl_addend;
+                        kprintf("fill rel address %08x to %08x\n", *(uint32_t *)mem_addr, mem_addr);
                         break;
 
                     default:
