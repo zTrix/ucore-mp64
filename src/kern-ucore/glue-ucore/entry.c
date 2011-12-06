@@ -44,6 +44,7 @@ __kern_entry(void)
 		fs_init();                  // init fs
 		
 		clock_init();
+		mod_init();
 
 		init_finished = 1;
 		spinlock_release(&init_lock);
@@ -66,9 +67,6 @@ __kern_entry(void)
 	while (init_finished != lcpu_count) ;
 
 	intr_enable();
-	if (lcpu_idx == 0) {
-		mod_init();
-	}
 	cpu_idle();                 // run idle process
 	
 	while (1) ;
