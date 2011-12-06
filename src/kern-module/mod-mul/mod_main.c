@@ -20,9 +20,13 @@ int mul(int a, int b, int *c) {
 }
 
 void init_module() {
+    kprintf("[ MM ] init mod-mul\n");
     register_mod_mul(mul);
+    kprintf("[ MM ] init mod-mul done\n");
 }
 
 void cleanup_module() {
+    kprintf("[ MM ] cleanup mod-mul\n");
     unregister_mod_mul();
+    kprintf("[ MM ] cleanup mod-mul done\n");
 }

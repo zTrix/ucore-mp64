@@ -256,6 +256,7 @@ static int elf_mod_parse(uintptr_t elf, const char *name, int export_symbol,
         error("align failed\n");
         return -1;
     } else if (cur_common_alloc > 0) {
+        // TODO: kmalloc would return non-kernel-area memory pointer, which would cause PG FAULT
         common_space = (uintptr_t)kmalloc(cur_common_alloc);
         memset((void*)common_space, 0, cur_common_alloc);
 

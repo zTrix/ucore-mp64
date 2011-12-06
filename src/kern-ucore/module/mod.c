@@ -13,6 +13,9 @@
 #define EXPORT(name) touch_export_sym(#name, (uintptr_t)&name, 0)
 typedef void (*voidfunc)();
 
+static unsigned char ko_pool[10240];
+static uintptr_t ko_pool_pointer;
+
 void register_mod_add(func_add_t f) {
     mod_touch_symbol(MOD_ADD, (void *)f, 0);
 }
@@ -39,7 +42,7 @@ int load_mod_file(char *name, uintptr_t *addr, uint32_t *size) {
         return -1;
     }
     kprintf("[ II ] loading kern module: %s, size = %d\n", name, mod_stat.st_size);
-    void * buffer = kmalloc(mod_stat.st_size + 1);
+    void * buffer = ko_pool_pointer;
     if (buffer == NULL) {
         kprintf("[ EE ] not enough memory to load the module\n");
         return -1;
@@ -47,6 +50,7 @@ int load_mod_file(char *name, uintptr_t *addr, uint32_t *size) {
     size_t copied;
     file_read(fd, buffer, mod_stat.st_size, &copied);
     kprintf("[ II ] module size: %d, mem addr: %x\n", copied, buffer);
+    ko_pool_pointer += copied;
     *addr = (uintptr_t)buffer;
     *size = mod_stat.st_size;
     return 0;
@@ -68,6 +72,8 @@ int load_module(char * name) {
 
 void mod_init() {
     kprintf("[ II ] mod_init\n");
+    ko_pool_pointer = (uintptr_t)ko_pool;
+
     mod_loader_init();
 
     kprintf("[ II ] exporting kernel symbols\n");
@@ -88,6 +94,6 @@ void mod_init() {
     int idx = find_export_sym(MOD_ADD, 0);
     int a = 1, b = 1, c = 0;
     ((func_add_t)get_sym_ptr(idx))(a, b, &c);
-    kprintf("[ TT ] %d + %d = %d\n");
+    kprintf("[ TT ] %d + %d = %d\n", a, b, c);
 }
 
