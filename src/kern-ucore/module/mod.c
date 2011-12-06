@@ -98,12 +98,6 @@ void mod_init() {
 
 #define MX_MOD_PATH_LEN 1024
 static char tmp_path[MX_MOD_PATH_LEN];
-static char path[MX_MOD_PATH_LEN];
-
-#define KERN_MODULE_PREFIX "/kern_module/"
-#define KERN_MODULE_SUFFIX ".ko"
-// must be the char count sum of the 2 strings above
-#define KERN_MODULE_ADDITIONAL_LEN 16
 
 uint64_t do_init_module(const char *name) {
     int ret;
@@ -118,13 +112,7 @@ uint64_t do_init_module(const char *name) {
     unlock_mm(mm);
     tmp_path[size] = '\0';
     
-    if (strcmp(".ko", &tmp_path[size - 3]) == 0) {       // full path syntax
-        
-    } else {                                            // just module name, shortcut
-        snprintf(path, size + KERN_MODULE_ADDITIONAL_LEN + 1, "%s%s%s", KERN_MODULE_PREFIX, tmp_path, KERN_MODULE_SUFFIX);
-    }
-    
-    ret = load_module(path);
+    ret = load_module(tmp_path);
     return ret;
 }
 
